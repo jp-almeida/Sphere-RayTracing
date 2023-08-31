@@ -108,8 +108,8 @@ int main(int argc, char* argv[]) {
 
         
 
-        int width = 640;
-        int height = 480;
+        int width = 1280;
+        int height = 720;
         int n = width * height;
         double aspectratio = (double)width / (double)height;
 
@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
         Vect Y(0, 1, 0);
         Vect Z(0, 0, 1);
 
-        Vect campos(3, 1.5, -4);
+        Vect campos(3.0, 1.5, 0);
         Vect look_at(0, 0, 0);
         Vect diff_btw(campos.getVectX() - look_at.getVectX(), campos.getVectY() - look_at.getVectY(), campos.getVectZ() - look_at.getVectZ());
 
@@ -131,12 +131,13 @@ int main(int argc, char* argv[]) {
         Color green(0.5, 1.0, 0.5, 0.5);
         Color gray(0.5, 0.5, 0.5, 0);
         Color black(0.0, 0.0, 0.0, 0);
+        Color red(1.0, 0, 0, 0);
 
         Vect light_position(-7, 10, -10);
         Light scene_light(light_position, white);
 
-        Sphere scene_sphere(O, 1, green);
-        Plane scene_plane(Y, -1, white);
+        Sphere scene_sphere(O, 1, red);
+        Plane scene_plane(Y, -1, gray);
 
         vector<Object*> scene_objects;
         scene_objects.push_back(&scene_sphere);
