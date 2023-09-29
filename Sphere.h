@@ -19,7 +19,7 @@ public:
   double getSphereRadius() { return radius; }
   virtual Color getColor() { return color; }
 
-  Vect getNormalAt(Vect point){
+  virtual Vect getNormalAt(Vect point){
     Vect normal_Vect = point.vectAdd(center.negative()).normalize();
     return normal_Vect;
   }

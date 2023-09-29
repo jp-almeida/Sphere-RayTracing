@@ -17,6 +17,7 @@
 #include "Color.h"
 #include "Light.h"
 #include "Sphere.h"
+#include "Source.h"
 #include "Object.h"
 #include "Plane.h"
 
@@ -52,6 +53,63 @@ int winningObjectIndex(vector<double> object_intersections){
             return -1;
         }
     }
+}
+
+Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, vector<Object*> scene_objects, int index_of_winning_object, vector<Source*> light_sources, double accuracy, double ambientlight){
+
+    Color winning_object_color = scene_objects.at(index_of_winning_object)->getColor();
+    Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
+
+    Color final_color = winning_object_color.colorScalar(ambientlight);
+
+    for (int light_index = 0; light_index < light_sources.size(); light_index++){
+        Vect light_direction = light_sources.at(light_index)->getLightPosition().vectAdd(intersection_position.negative()).normalize();
+        
+        float cosine_angle = winning_object_normal.dot(light_direction);
+
+        if (cosine_angle > 0){
+            bool shadowed = false;
+
+            Vect distance_to_light = light_sources.at(light_index)->getLightPosition().vectAdd(intersection_position.negative()).normalize();
+            float distance_to_light_magnitude = distance_to_light.magnitude();
+
+            Ray shadow_ray(intersection_position, light_sources.at(light_index)->getLightPosition().vectAdd(intersection_position.negative()));
+
+            vector<double> secondary_intersections;
+
+            for (int object_index = 0; object_index < scene_objects.size() && shadowed ==false; object_index++){
+                secondary_intersections.push_back(scene_objects.at(object_index)->findIntersection(shadow_ray));
+            }
+
+            for (int c = 0; c < secondary_intersections.size(); c++){
+                if (secondary_intersections.at(c) > accuracy){
+                    if (secondary_intersections.at(c) <= distance_to_light_magnitude){
+                        shadowed = true;
+                    }
+                    break;
+                }
+                if (shadowed == false){
+                    final_color = final_color.colorAdd(winning_object_color.colorMultiply(light_sources.at(light_index)->getLightColor()).colorScalar(cosine_angle));
+
+                    if (winning_object_color.getColorSpecial()> 0 && winning_object_color.getColorSpecial() <=1){
+                        double dot1 = winning_object_normal.dot(intersecting_ray_direction.negative());
+                        Vect scalar1 = winning_object_normal.vectMult(dot1);
+                        Vect add1 = scalar1.vectAdd(intersecting_ray_direction);
+                        Vect scalar2 = add1.vectMult(2);
+                        Vect add2 = intersecting_ray_direction.negative().vectAdd(scalar2);
+                        Vect reflection_direction = add2.normalize();
+
+                        double specular = reflection_direction.dot(light_direction);
+                        if (specular > 0){
+                            specular = pow(specular, 10);
+                            final_color = final_color.colorAdd(light_sources.at(light_index)->getLightColor().colorScalar(specular * winning_object_color.getColorSpecial()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+        return final_color.clip();
 }
 
 int main(int argc, char* argv[]) {
@@ -112,14 +170,16 @@ int main(int argc, char* argv[]) {
         int height = 720;
         int n = width * height;
         double aspectratio = (double)width / (double)height;
+        double ambientlight = 0.2f;
+        double accuracy = 0.000001;
 
-        Vect O(0, 0, 0);
+        Vect O(0.0f, 0.0f, -6.0f);
         Vect X(1, 0, 0);
         Vect Y(0, 1, 0);
         Vect Z(0, 0, 1);
 
-        Vect campos(3.0, 1.5, 0);
-        Vect look_at(0, 0, 0);
+        Vect campos(0.0f, 0.0f, 0.0f);
+        Vect look_at(0, 0, -10);
         Vect diff_btw(campos.getVectX() - look_at.getVectX(), campos.getVectY() - look_at.getVectY(), campos.getVectZ() - look_at.getVectZ());
 
         Vect camdir = diff_btw.negative().normalize();
@@ -133,15 +193,17 @@ int main(int argc, char* argv[]) {
         Color black(0.0, 0.0, 0.0, 0);
         Color red(1.0, 0, 0, 0);
 
-        Vect light_position(-7, 10, -10);
+        Vect light_position(0.0f, 5.0f, 0.0f);
         Light scene_light(light_position, white);
+        vector<Source*> light_sources;
+        light_sources.push_back(dynamic_cast<Source*>(&scene_light));
 
         Sphere scene_sphere(O, 1, red);
-        Plane scene_plane(Y, -1, gray);
+        // Plane scene_plane(Y, -1, gray);
 
         vector<Object*> scene_objects;
         scene_objects.push_back(&scene_sphere);
-        scene_objects.push_back(&scene_plane);
+        // scene_objects.push_back(&scene_plane);
 
         double xamnt, yamnt;
 
@@ -175,12 +237,19 @@ int main(int argc, char* argv[]) {
                     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); 
                     SDL_RenderDrawPoint(renderer, x, y); //<---- Aqui escolhemos qual pixel vamos pintar
                 }else{
-                    Color this_color = scene_objects.at(index_of_winning_object)->getColor();
-                    double r = this_color.getColorRed() * 255;
-                    double g = this_color.getColorGreen() * 255;
-                    double b = this_color.getColorBlue() * 255;
-                    SDL_SetRenderDrawColor(renderer, r, g, b, 255); 
-                    SDL_RenderDrawPoint(renderer, x, y); //<---- Aqui escolhemos qual pixel vamos pintar
+                    if(intersections.at(index_of_winning_object) > accuracy){
+
+                        Vect intersection_position = cam_ray_origin.vectAdd(cam_ray_direction.vectMult(intersections.at(index_of_winning_object)));
+                        Vect intersecting_ray_direction = cam_ray_direction;
+
+
+                        Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, light_sources, accuracy, ambientlight);
+                        double r = intersection_color.getColorRed() * 255;
+                        double g = intersection_color.getColorGreen() * 255;
+                        double b = intersection_color.getColorBlue() * 255;
+                        SDL_SetRenderDrawColor(renderer, r, g, b, 255); 
+                        SDL_RenderDrawPoint(renderer, x, y); //<---- Aqui escolhemos qual pixel vamos pintar
+                    }
                 }
 
                 
